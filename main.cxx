@@ -12,6 +12,8 @@
 #include <chrono> 
 #include<string> 
 #include<math.h>
+#include<fstream>
+
 using namespace cv;
 using namespace std;
 using namespace std::chrono;
@@ -40,7 +42,6 @@ int thickness = 60;
 int maxDisparity = 50;
 int maxkernelSize = 35; // kernel size must be odd number.
 int kernelSize = 9;
-int midleDisparity = 14;
 auto sstereoResult = make_shared<Mat>();
 typedef vector<pixel*> layerVector;
 vector<layerVector> layers;
@@ -58,6 +59,7 @@ void SSDstereo(shared_ptr<Mat>, shared_ptr<Mat>,shared_ptr<Mat>, int, int);
 //void selsectiveStereo(shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, layerVector*, int, int);
 void selsectiveStereo(shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, int, int);
 void prepareResult(shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, vector<layerVector>, int, int, int, string);
+void reportResult(string );
 void filterResult(shared_ptr<Mat>, shared_ptr<Mat>, Vec3b);
 void checkPoint(shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Stain>, int, int, Vec3b,int*);
 void makeStain(shared_ptr<Mat> , shared_ptr<Mat> , shared_ptr<Stain> , int , int, Vec3b,int*);
@@ -83,11 +85,14 @@ int main()
 	auto duration = duration_cast<seconds>(stop - start);
 	auto value = duration.count();
 	string duration_s = to_string(value);
+	ofstream repotredResult;
+	repotredResult.open("result.txt");
+	repotredResult << "Totaltime of SSDstereo result is "+ duration_s +" (s)"<< std::endl;
+	repotredResult.close();
 
 
 
-
-	for (int midDis = 1; midDis < maxDisparity; midDis++) {
+	for (int midDis = 1; midDis <= maxDisparity; midDis++) {
 		auto result_00 = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC1);// Stereo result.
 		auto result_01 = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC3);// Selective stereo L2R.
 		auto result_02 = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC3);// Selective stereo R2L.
@@ -289,6 +294,7 @@ void prepareResult(shared_ptr<Mat> result, shared_ptr<Mat> result_01, shared_ptr
 ////////////////////////////////////////////////////////////////////
 
 void selsectiveStereo(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage, shared_ptr<Mat> result_1, shared_ptr<Mat> result_2, shared_ptr<Mat> result_3, int kernelSize, int midelDisparity) {
+	auto start = chrono::high_resolution_clock::now();
 	bool left2right = false;
 	bool right2let = false;
 	int temp0 = midelDisparity - 1;
@@ -319,14 +325,19 @@ void selsectiveStereo(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage, sha
 			tempCost4 = CalcCost(rightImage, leftImage, v, u, kernelSize, temp4);
 			tempCost5 = CalcCost(rightImage, leftImage, v, u, kernelSize, temp5);
 			
-			if (tempCost1 < tempCost0 & tempCost1 < tempCost2) {
+
+			/////////////////////////////////////////////////////////////////////
+			///////////// In these two if cluse we are making image by left ref and right ref ... and after that we are making crose checked redult.
+			////////////////////////////////////////////////////////////////////
+
+			/*if (tempCost1 < tempCost0 & tempCost1 < tempCost2) {
 				left2right = true;
 				result_1->at<Vec3b>(Point(u, v)) = bgrPixel_01;
 			}
 			if (tempCost4 < tempCost3 & tempCost4 < tempCost5) {
 				right2let = true;
 				result_2->at<Vec3b>(Point(u, v)) = bgrPixel_02;
-			}
+			}*/
 			if ((left2right & right2let)) {
 
 				result_3->at<Vec3b>(Point(u, v)) = bgrPixel_04;
@@ -338,12 +349,21 @@ void selsectiveStereo(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage, sha
 	//imshow("result_1", *result_1);
 	//imshow("result_2", *result_2);
 	//imshow("result_3", *result_3);
-	cv::hconcat(*result_1, *result_2, *totalResult);
-	cv::hconcat(*totalResult, *result_3, *totalResult);
-	imshow("totalResult", *totalResult);
+	//cv::hconcat(*result_1, *result_2, *totalResult);
+	//cv::hconcat(*totalResult, *result_3, *totalResult);
+	//string tempName = "totalResult_midDisparity_" + to_string(midelDisparity) + ".png";
+	//imwrite(tempName, *totalResult);
+	//waitKey(10);
 
-	waitKey(10);
+	chrono::high_resolution_clock::time_point stop = high_resolution_clock::now();
+	auto duration = duration_cast<seconds>(stop - start);
+	auto value = duration.count();
+	string duration_s = to_string(value);
+	string TempTimer = "the time of calculation of "+to_string(midelDisparity)+" midelDisparity is "+ duration_s + " (s)";
+	reportResult(TempTimer);
 
+
+	
 		
 }
 
@@ -486,4 +506,16 @@ void mergingStains(shared_ptr<Mat> input, shared_ptr<vector<shared_ptr<Stain>>> 
 			}
 		}
 	}
+}
+
+
+
+void reportResult(string Text) {
+
+	ofstream repotredResult;
+	repotredResult.open("result.txt", std::ios_base::app | std::ios_base::out);
+	repotredResult << Text << std::endl;
+	repotredResult.close();
+
+
 }
