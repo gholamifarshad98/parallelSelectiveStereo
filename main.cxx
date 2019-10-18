@@ -55,7 +55,7 @@ Vec3b bgrPixel_01(0, 0, 255);
 Vec3b bgrBackground(0, 0, 0);
 vector<int*> stainSize;
 void SSDstereo(shared_ptr<Mat>, shared_ptr<Mat>,shared_ptr<Mat>, int, int);
-void selsectiveStereo(shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, layerVector*, int, int);
+//void selsectiveStereo(shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, layerVector*, int, int);
 void selsectiveStereo(shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, int, int);
 void prepareResult(shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, vector<layerVector>, int, int, int, string);
 void filterResult(shared_ptr<Mat>, shared_ptr<Mat>, Vec3b);
@@ -87,20 +87,20 @@ int main()
 
 
 
-	//for (int midDis = 1; midDis < maxDisparity; midDis++) {
-	//	auto result_00 = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC1);// Stereo result.
-	//	auto result_01 = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC3);// Selective stereo L2R.
-	//	auto result_02 = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC3);// Selective stereo R2L.
-	//	auto result_03 = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC3);// slective with L2R and R2L consistance.
-	//	auto result_04 = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC3);// slective with L2R and R2L notconsistance.
-	//	auto result_total = make_shared<Mat>(4 * numOfRows, numOfColumns, CV_8UC3, bgrBackground);
-	//	prepareResult(result_00, result_01, result_02, result_03, layers, numOfRows, numOfColumns, kernelSize, duration_s);
+	for (int midDis = 1; midDis < maxDisparity; midDis++) {
+		auto result_00 = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC1);// Stereo result.
+		auto result_01 = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC3);// Selective stereo L2R.
+		auto result_02 = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC3);// Selective stereo R2L.
+		auto result_03 = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC3);// slective with L2R and R2L consistance.
+		auto result_04 = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC3);// slective with L2R and R2L notconsistance.
+		auto result_total = make_shared<Mat>(4 * numOfRows, numOfColumns, CV_8UC3, bgrBackground);
+		prepareResult(result_00, result_01, result_02, result_03, layers, numOfRows, numOfColumns, kernelSize, duration_s);
 
-	//	////////////////////////////////////////////////////////////////////
-	//	/// In this part we have impelemet selective stereo.
-	//	////////////////////////////////////////////////////////////////////
-	//	selsectiveStereo(leftImage, rightImage, result_01, result_02, result_03, kernelSize, midDis);
-
+		////////////////////////////////////////////////////////////////////
+		/// In this part we have impelemet selective stereo.
+		////////////////////////////////////////////////////////////////////
+		selsectiveStereo(leftImage, rightImage, result_01, result_02, result_03, kernelSize, midDis);
+	}
 	//	try {
 	//		cvtColor(*result_00, *result_00, CV_GRAY2RGB);
 	//		result_00->copyTo((*result_total)(Rect(0, 0 * numOfRows, numOfColumns, numOfRows)));
@@ -237,8 +237,8 @@ void  SSDstereo(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage,shared_ptr
 			//std::cout << " tempDisparity is " << tempDisparity << std::endl;
 		}
 	}
-	cv::imshow("stereoOutput", *result_temp);
-	cv::waitKey(100000);
+	//cv::imshow("stereoOutput", *result_temp);
+	//cv::waitKey(50);
 }
 
 
@@ -287,7 +287,8 @@ void prepareResult(shared_ptr<Mat> result, shared_ptr<Mat> result_01, shared_ptr
 ////////////////////////////////////////////////////////////////////
 /// In this part we clac selective disparity of each pixel.
 ////////////////////////////////////////////////////////////////////
-void selsectiveStereo(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage, shared_ptr<Mat> result_1, shared_ptr<Mat> result_2, shared_ptr<Mat> result_3, layerVector* layer, int kernelSize, int midelDisparity) {
+
+void selsectiveStereo(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage, shared_ptr<Mat> result_1, shared_ptr<Mat> result_2, shared_ptr<Mat> result_3, int kernelSize, int midelDisparity) {
 	bool left2right = false;
 	bool right2let = false;
 	int temp0 = midelDisparity - 1;
@@ -305,38 +306,45 @@ void selsectiveStereo(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage, sha
 	int tempCost3;
 	int tempCost4;
 	int tempCost5;
-	for (int p = 1; p < layer->size(); p++) {
-		left2right = false;
-		right2let = false;
-		tempCost0 = CalcCost(leftImage, rightImage, (*layer)[p]->row, (*layer)[p]->column, kernelSize, temp0);
-		tempCost1 = CalcCost(leftImage, rightImage, (*layer)[p]->row, (*layer)[p]->column, kernelSize, temp1);
-		tempCost2 = CalcCost(leftImage, rightImage, (*layer)[p]->row, (*layer)[p]->column, kernelSize, temp2);
 
-		tempCost3 = CalcCost(rightImage, leftImage, (*layer)[p]->row, (*layer)[p]->column, kernelSize, temp3);
-		tempCost4 = CalcCost(rightImage, leftImage, (*layer)[p]->row, (*layer)[p]->column, kernelSize, temp4);
-		tempCost5 = CalcCost(rightImage, leftImage, (*layer)[p]->row, (*layer)[p]->column, kernelSize, temp5);
+	for (int u = (kernelSize / 2) + 1; u < (numOfColumns - maxDisparity - kernelSize / 2) - 1; u++) {
+		for (int v = (kernelSize / 2) + 1; v < numOfRows; v++) {
+			left2right = false;
+			right2let = false;
+			tempCost0 = CalcCost(leftImage, rightImage, v, u, kernelSize, temp0);
+			tempCost1 = CalcCost(leftImage, rightImage, v, u, kernelSize, temp1);
+			tempCost2 = CalcCost(leftImage, rightImage, v, u, kernelSize, temp2);
 
-		if (tempCost1 < tempCost0 & tempCost1 < tempCost2) {
-			left2right = true;
-			result_1->at<Vec3b>(Point((*layer)[p]->column, (*layer)[p]->row)) = bgrPixel_01;
+			tempCost3 = CalcCost(rightImage, leftImage, v, u, kernelSize, temp3);
+			tempCost4 = CalcCost(rightImage, leftImage, v, u, kernelSize, temp4);
+			tempCost5 = CalcCost(rightImage, leftImage, v, u, kernelSize, temp5);
+			
+			if (tempCost1 < tempCost0 & tempCost1 < tempCost2) {
+				left2right = true;
+				result_1->at<Vec3b>(Point(u, v)) = bgrPixel_01;
+			}
+			if (tempCost4 < tempCost3 & tempCost4 < tempCost5) {
+				right2let = true;
+				result_2->at<Vec3b>(Point(u, v)) = bgrPixel_02;
+			}
+			if ((left2right & right2let)) {
+
+				result_3->at<Vec3b>(Point(u, v)) = bgrPixel_04;
+			}
 		}
-		if (tempCost4 < tempCost3 & tempCost4 < tempCost5) {
-			right2let = true;
-			result_2->at<Vec3b>(Point((*layer)[p]->column, (*layer)[p]->row)) = bgrPixel_02;
-		}
-		if ((left2right & right2let)) {
-
-			result_3->at<Vec3b>(Point((*layer)[p]->column, (*layer)[p]->row)) = bgrPixel_04;
-		}
-
-
 	}
-}
+	auto totalResult = make_shared<Mat>(numOfRows, 2*numOfColumns, CV_8UC3);;
+	//*totalResult = *result_1;
+	//imshow("result_1", *result_1);
+	//imshow("result_2", *result_2);
+	//imshow("result_3", *result_3);
+	cv::hconcat(*result_1, *result_2, *totalResult);
+	cv::hconcat(*totalResult, *result_3, *totalResult);
+	imshow("totalResult", *totalResult);
 
-void selsectiveStereo(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage, shared_ptr<Mat> result1, shared_ptr<Mat> result2, shared_ptr<Mat> result3, int kernelSize, int midelDisparity) {
-	for (int i = 0; i < layers.size(); i++) {
-		selsectiveStereo(leftImage, rightImage, result1, result2, result3, &layers[i], kernelSize, midelDisparity);
-	}
+	waitKey(10);
+
+		
 }
 
 ////////////////////////////////////////////////////////////////////
