@@ -1,0 +1,12 @@
+cmake_minimum_required(VERSION 3.10)
+set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR}/../install CACHE STRING "..." FORCE)
+project (ParallelSelectiveStereo)
+add_executable (ParallelSelectiveStereo main.cxx)
+set(CMAKE_BINARY_DIR "${PROJECT_SOURCE_DIR}/../Install/")
+set(EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR})
+find_library(opencv_world342_LIB opencv_world342)
+find_library(opencv_world342d_LIB opencv_world342d)
+target_link_libraries(ParallelSelectiveStereo "${opencv_world342_LIB}")
+target_link_libraries(ParallelSelectiveStereo "${opencv_world342d_LIB}")
+include_directories(${PROJECT_SOURCE_DIR}/../3rdParty/include)
+
