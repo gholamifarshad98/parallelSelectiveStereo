@@ -38,6 +38,8 @@ struct Stain
 };
 int numOfColumns;
 int numOfRows;
+int numOfColumnsResized;
+int numOfRowsResized;
 int thickness = 60;
 int maxDisparity = 50;
 int maxkernelSize = 35; // kernel size must be odd number.
@@ -48,17 +50,17 @@ vector<layerVector> layers;
 void ReadBothImages(shared_ptr<Mat>, shared_ptr<Mat>);
 void Meshing(int, int, int, int, int);
 double CalcDistance(int, int, int, int);
-int CalcCost(shared_ptr<Mat>, shared_ptr<Mat>, int, int, int, int);
+int CalcCost(shared_ptr<Mat>, shared_ptr<Mat>, int, int, int, int,int);
 Vec3b bgrPixel_02(0, 255, 255);
 Vec3b bgrPixel_04(255, 0, 0);
 Vec3b bgrPixel_03(0, 255, 0);
 Vec3b bgrPixel_01(0, 0, 255);
 Vec3b bgrBackground(0, 0, 0);
 vector<int*> stainSize;
-void SSDstereo(shared_ptr<Mat>, shared_ptr<Mat>,shared_ptr<Mat>, int, int);
+void SSDstereo(shared_ptr<Mat>, shared_ptr<Mat>,shared_ptr<Mat>, int, int,int,int);
 //void selsectiveStereo(shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, layerVector*, int, int);
-void selsectiveStereo(shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, int, int);
-void prepareResult(shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, vector<layerVector>, int, int, int, string);
+void selsectiveStereo(shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, int, int,int, int);
+void prepareResult(shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, vector<layerVector>, int, int, int);
 void reportResult(string );
 void filterResult(shared_ptr<Mat>, shared_ptr<Mat>, Vec3b);
 void checkPoint(shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Stain>, int, int, Vec3b,int*);
@@ -70,82 +72,78 @@ int main()
 	auto rightImage = make_shared<Mat>();
 	auto leftImage = make_shared<Mat>();
 	ReadBothImages(leftImage, rightImage);
-	
-	auto start = chrono::high_resolution_clock::now();
+	auto rightImageResized = make_shared<Mat>();
+	auto leftImageResized = make_shared<Mat>();
+	cv::resize(*rightImage, *rightImageResized, cv::Size(), 0.5, 0.5);
+	cv::resize(*leftImage, *leftImageResized, cv::Size(), 0.5, 0.5);
+	numOfRows = leftImage->rows;
+	numOfColumns = leftImage->cols;
+	numOfRowsResized = leftImageResized->rows;
+	numOfColumnsResized = leftImageResized->cols;
+	auto stereoResut = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC1);
+	auto stereoResutResized = make_shared<Mat>(numOfRowsResized, numOfColumnsResized, CV_8UC1);
+	//try
+	//{
+	//	auto start = chrono::high_resolution_clock::now();
+	//	
+	//	SSDstereo(leftImage, rightImage, stereoResut, kernelSize, maxDisparity, numOfRows, numOfColumns);
+	//	//cv::imshow("stereoOutput", *stereoResut);
+	//	//cv::waitKey(00);
+	//	chrono::high_resolution_clock::time_point stop = high_resolution_clock::now();
+	//	auto duration = duration_cast<seconds>(stop - start);
+	//	auto value = duration.count();
+	//	string duration_s = to_string(value);
+	//	ofstream repotredResult;
+	//	repotredResult.open("result.txt");
+	//	repotredResult << "Totaltime of SSDstereo result is " + duration_s + " (s)" << std::endl;
+	//	repotredResult.close();
+	//}
+	//catch (cv::Exception & e)
+	//{
+	//	cerr << e.msg << endl; // output exception message
+	//}
+
 	try
 	{
-		auto stereoResut=make_shared<Mat>(numOfRows, numOfColumns, CV_8UC1);
-		SSDstereo(leftImage, rightImage, stereoResut, kernelSize, maxDisparity);
+		auto start = chrono::high_resolution_clock::now();
+		
+		SSDstereo(leftImageResized, rightImageResized, stereoResutResized, kernelSize, maxDisparity, numOfRowsResized, numOfColumnsResized);
+		//cv::imshow("stereoOutputResized", *stereoResutResized);
+		//cv::waitKey(10000);
+		chrono::high_resolution_clock::time_point stop = high_resolution_clock::now();
+		auto duration = duration_cast<seconds>(stop - start);
+		auto value = duration.count();
+		string duration_s = to_string(value);
+		ofstream repotredResult;
+		repotredResult.open("result_selective.txt");
+		repotredResult << "Totaltime of SSDstereo result is " + duration_s + " (s)" << std::endl;
+		repotredResult.close();
 	}
 	catch (cv::Exception & e)
 	{
 		cerr << e.msg << endl; // output exception message
 	}
-	chrono::high_resolution_clock::time_point stop = high_resolution_clock::now();
-	auto duration = duration_cast<seconds>(stop - start);
-	auto value = duration.count();
-	string duration_s = to_string(value);
-	ofstream repotredResult;
-	repotredResult.open("result.txt");
-	repotredResult << "Totaltime of SSDstereo result is "+ duration_s +" (s)"<< std::endl;
-	repotredResult.close();
+	
 
 
 
 	for (int midDis = 1; midDis <= maxDisparity; midDis++) {
-		auto result_00 = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC1);// Stereo result.
-		auto result_01 = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC3);// Selective stereo L2R.
-		auto result_02 = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC3);// Selective stereo R2L.
-		auto result_03 = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC3);// slective with L2R and R2L consistance.
-		auto result_04 = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC3);// slective with L2R and R2L notconsistance.
-		auto result_total = make_shared<Mat>(4 * numOfRows, numOfColumns, CV_8UC3, bgrBackground);
-		prepareResult(result_00, result_01, result_02, result_03, layers, numOfRows, numOfColumns, kernelSize, duration_s);
-
+		auto result_00 = make_shared<Mat>(numOfRowsResized, numOfColumnsResized, CV_8UC1);// Stereo result.
+		*result_00 = *stereoResutResized;
+		auto result_01 = make_shared<Mat>(numOfRowsResized, numOfColumnsResized, CV_8UC3);// Selective stereo L2R.
+		auto result_02 = make_shared<Mat>(numOfRowsResized, numOfColumnsResized, CV_8UC3);// Selective stereo R2L.
+		auto result_03 = make_shared<Mat>(numOfRowsResized, numOfColumnsResized, CV_8UC3);// slective with L2R and R2L consistance.
+		auto result_04 = make_shared<Mat>(numOfRowsResized, numOfColumnsResized, CV_8UC3);// slective with L2R and R2L notconsistance.
+		auto result_total = make_shared<Mat>(4 * numOfRowsResized, numOfColumnsResized, CV_8UC3, bgrBackground);
+		cvtColor(*result_00, *result_01, CV_GRAY2RGB);
+		cvtColor(*result_00, *result_02, CV_GRAY2RGB);
+		cvtColor(*result_00, *result_03, CV_GRAY2RGB);
 		////////////////////////////////////////////////////////////////////
 		/// In this part we have impelemet selective stereo.
 		////////////////////////////////////////////////////////////////////
-		selsectiveStereo(leftImage, rightImage, result_01, result_02, result_03, kernelSize, midDis);
+		selsectiveStereo(leftImageResized, rightImageResized, result_01, result_02, result_03, kernelSize, midDis, numOfRowsResized, numOfColumnsResized);
 	}
-	//	try {
-	//		cvtColor(*result_00, *result_00, CV_GRAY2RGB);
-	//		result_00->copyTo((*result_total)(Rect(0, 0 * numOfRows, numOfColumns, numOfRows)));
-	//		result_01->copyTo((*result_total)(Rect(0, 1 * numOfRows, numOfColumns, numOfRows)));
-	//		result_02->copyTo((*result_total)(Rect(0, 2 * numOfRows, numOfColumns, numOfRows)));
-	//		result_03->copyTo((*result_total)(Rect(0, 3 * numOfRows, numOfColumns, numOfRows)));
 
-	//	}
-	//	catch (cv::Exception & e)
-	//	{
-	//		cerr << e.msg << endl; // output exception message
-	//	}
-	//	string temp;
-	//	temp = "result_midDis_" + to_string(midDis) + "withFilter.png";
-	//	imwrite(temp, *result_03);
-	//	filterResult(result_00, result_03, bgrPixel_04);
-	//	temp = "result_midDis_" + to_string(midDis) + "withoutFilter.png";
-	//	imwrite(temp, *result_03);
-	//	std::cout << "before stainDetector" << std::endl;
-	//	shared_ptr<vector<shared_ptr<Stain>>> stainResults = make_shared<vector<shared_ptr<Stain>>>() ;
-	//	try
-	//	{
-	//		stainDetector(result_00, result_03, bgrPixel_04, stainResults);
-
-	//	}
-	//	catch (cv::Exception & e1)
-	//	{
-	//		cerr << e1.msg << endl; // output exception message
-	//	}
-	//	
-	//	/*for (int i = 1; i < stainResults->size(); i++) {
-	//		cv::Rect tempRect = Rect(((*stainResults)[i])->minI, ((*stainResults)[i])->minJ, ((*stainResults)[i])->maxI- ((*stainResults)[i])->minI, ((*stainResults)[i])->maxJ- ((*stainResults)[i])->minJ);
-	//		cv::rectangle(*result_03,tempRect, cv::Scalar(0, 255, 0));
-	//		std::cout << "the area is " <<(*(stainSize)[i]) << std::endl;
-	//	}*/
-	//	//mergingStains(result_03, stainResults);
-	//	imshow("result_total", *result_03);
-	//	waitKey(1000);
-	//	cout << midDis << endl;
-	//}
 	return 0;
 }
 
@@ -161,8 +159,7 @@ void ReadBothImages(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage) {
 		*leftImage = imread("2.png", CV_LOAD_IMAGE_GRAYSCALE);   // Read the left image
 		//leftImage->convertTo(*leftImage, CV_64F);
 		*leftImage = *leftImage;
-		numOfRows = leftImage->rows;
-		numOfColumns = leftImage->cols;
+		
 		if (!rightImage->data)                             // Check for invalid input
 		{
 			throw "right";
@@ -222,16 +219,16 @@ double CalcDistance(int numOfRows, int numOfColumns, int row, int column) {
 ////////////////////////////////////////////////////////////////////
 /// In this part we clac disparity of each pixel.
 ////////////////////////////////////////////////////////////////////
-void  SSDstereo(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage,shared_ptr<Mat> result_temp, int kernelSize, int maxDisparity) {
+void  SSDstereo(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage,shared_ptr<Mat> result_temp, int kernelSize, int maxDisparity,int NRow,int NCols) {
 	int tempCost = 0;
 	int tempDisparity = 0;
-	for (int u = (kernelSize/2)+1; u <(numOfColumns-maxDisparity-kernelSize/2)-1 ; u++) {
-		for (int v = (kernelSize / 2) + 1; v <numOfRows ; v++) {
+	for (int u = (kernelSize/2)+1; u <(NCols -maxDisparity-kernelSize/2)-1 ; u++) {
+		for (int v = (kernelSize / 2) + 1; v <NRow; v++) {
 			double cost = 10000000;
 			tempCost = 0;
 			tempDisparity = 0;
 			for (int i = 0; i < maxDisparity; i++) {
-				tempCost = CalcCost(leftImage, rightImage,v ,u , kernelSize, i);
+				tempCost = CalcCost(leftImage, rightImage,v ,u , kernelSize, i, NCols);
 				if (tempCost < cost) {
 					cost = tempCost;
 					tempDisparity = i;
@@ -243,14 +240,14 @@ void  SSDstereo(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage,shared_ptr
 		}
 	}
 	//cv::imshow("stereoOutput", *result_temp);
-	//cv::waitKey(50);
+	//cv::waitKey(100);
 }
 
 
 ////////////////////////////////////////////////////////////////////
 /// In this part we clac cost of each pixel for sepecfic disparity.
 ////////////////////////////////////////////////////////////////////
-int CalcCost(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage, int row, int column, int kernelSize, int disparity) {
+int CalcCost(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage, int row, int column, int kernelSize, int disparity,int NCols) {
 	int cost = 0;
 	for (int u = -int(kernelSize / 2); u <= int(kernelSize / 2); u++) {
 		for (int v = -int(kernelSize / 2); v <= int(kernelSize / 2); v++) {
@@ -259,7 +256,7 @@ int CalcCost(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage, int row, int
 			int temp3 = row + u + disparity;
 			int temp4 = column + v;
 			// for error handeling.
-			if (column + u + disparity >= numOfColumns) {
+			if (column + u + disparity >= NCols) {
 				cout << "*****************************************************" << endl;
 			}
 			cost = cost + int(pow((leftImage->at<uchar>(row + v, column + u) - (rightImage->at<uchar>(row + v, column + u + disparity))), 2));
@@ -270,30 +267,10 @@ int CalcCost(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage, int row, int
 
 
 ////////////////////////////////////////////////////////////////////
-/// In this part we can make the result.
-////////////////////////////////////////////////////////////////////
-void prepareResult(shared_ptr<Mat> result, shared_ptr<Mat> result_01, shared_ptr<Mat> result_02, shared_ptr<Mat> result_03, vector<layerVector> layers, int numOfRows, int numOfColumns, int kernalSize, string Dutime) {
-
-	for (int i = 0; i < layers.size(); i++) {
-		for (int j = 0; j < layers[i].size(); j++) {
-			result->at<uchar>(layers[i][j]->row, layers[i][j]->column) = uchar(255 * layers[i][j]->disparity / 30);
-		}
-
-	}
-	//string temp;
-	//auto result_temp = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC3);
-	//temp = "result_KernelSize_" + to_string(kernalSize) + "_MaxDisparity_" + to_string(maxDisparity) + "Time_" + Dutime + "s.png";
-	cvtColor(*result, *result_01, CV_GRAY2RGB);
-	cvtColor(*result, *result_02, CV_GRAY2RGB);
-	cvtColor(*result, *result_03, CV_GRAY2RGB);
-}
-
-
-////////////////////////////////////////////////////////////////////
 /// In this part we clac selective disparity of each pixel.
 ////////////////////////////////////////////////////////////////////
 
-void selsectiveStereo(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage, shared_ptr<Mat> result_1, shared_ptr<Mat> result_2, shared_ptr<Mat> result_3, int kernelSize, int midelDisparity) {
+void selsectiveStereo(shared_ptr<Mat> leftImage_, shared_ptr<Mat> rightImage_, shared_ptr<Mat> result_1_, shared_ptr<Mat> result_2_, shared_ptr<Mat> result_3_, int kernelSize, int midelDisparity, int NRow, int NCols) {
 	auto start = chrono::high_resolution_clock::now();
 	bool left2right = false;
 	bool right2let = false;
@@ -313,47 +290,47 @@ void selsectiveStereo(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage, sha
 	int tempCost4;
 	int tempCost5;
 
-	for (int u = (kernelSize / 2) + 1; u < (numOfColumns - maxDisparity - kernelSize / 2) - 1; u++) {
-		for (int v = (kernelSize / 2) + 1; v < numOfRows; v++) {
+	for (int u = (kernelSize / 2) + 1; u < (NCols - maxDisparity - kernelSize / 2) - 1; u++) {
+		for (int v = (kernelSize / 2) + 1; v < NRow; v++) {
 			left2right = false;
 			right2let = false;
-			tempCost0 = CalcCost(leftImage, rightImage, v, u, kernelSize, temp0);
-			tempCost1 = CalcCost(leftImage, rightImage, v, u, kernelSize, temp1);
-			tempCost2 = CalcCost(leftImage, rightImage, v, u, kernelSize, temp2);
+			tempCost0 = CalcCost(leftImage_, rightImage_, v, u, kernelSize, temp0, NCols);
+			tempCost1 = CalcCost(leftImage_, rightImage_, v, u, kernelSize, temp1, NCols);
+			tempCost2 = CalcCost(leftImage_, rightImage_, v, u, kernelSize, temp2, NCols);
 
-			tempCost3 = CalcCost(rightImage, leftImage, v, u, kernelSize, temp3);
-			tempCost4 = CalcCost(rightImage, leftImage, v, u, kernelSize, temp4);
-			tempCost5 = CalcCost(rightImage, leftImage, v, u, kernelSize, temp5);
+			tempCost3 = CalcCost(rightImage_, leftImage_, v, u, kernelSize, temp3, NCols);
+			tempCost4 = CalcCost(rightImage_, leftImage_, v, u, kernelSize, temp4, NCols);
+			tempCost5 = CalcCost(rightImage_, leftImage_, v, u, kernelSize, temp5, NCols);
 			
 
 			/////////////////////////////////////////////////////////////////////
 			///////////// In these two if cluse we are making image by left ref and right ref ... and after that we are making crose checked redult.
 			////////////////////////////////////////////////////////////////////
 
-			/*if (tempCost1 < tempCost0 & tempCost1 < tempCost2) {
+			if (tempCost1 < tempCost0 & tempCost1 < tempCost2) {
 				left2right = true;
-				result_1->at<Vec3b>(Point(u, v)) = bgrPixel_01;
+				//result_1->at<Vec3b>(Point(u, v)) = bgrPixel_01;
 			}
 			if (tempCost4 < tempCost3 & tempCost4 < tempCost5) {
 				right2let = true;
-				result_2->at<Vec3b>(Point(u, v)) = bgrPixel_02;
-			}*/
+				//result_2->at<Vec3b>(Point(u, v)) = bgrPixel_02;
+			}
 			if ((left2right & right2let)) {
 
-				result_3->at<Vec3b>(Point(u, v)) = bgrPixel_04;
+				result_3_->at<Vec3b>(Point(u, v)) = bgrPixel_04;
 			}
 		}
 	}
-	auto totalResult = make_shared<Mat>(numOfRows, 2*numOfColumns, CV_8UC3);;
-	//*totalResult = *result_1;
+	//auto totalResult = make_shared<Mat>(NRow, 2* NCols, CV_8UC3);;
+	//*totalResult = *result_1_;
 	//imshow("result_1", *result_1);
 	//imshow("result_2", *result_2);
-	//imshow("result_3", *result_3);
-	//cv::hconcat(*result_1, *result_2, *totalResult);
-	//cv::hconcat(*totalResult, *result_3, *totalResult);
-	//string tempName = "totalResult_midDisparity_" + to_string(midelDisparity) + ".png";
-	//imwrite(tempName, *totalResult);
-	//waitKey(10);
+	imshow("result_3_", *result_3_);
+	//cv::hconcat(*result_1_, *result_2_, *totalResult);
+	//cv::hconcat(*totalResult, *result_3_, *totalResult);
+	string tempName = "totalResult_midDisparity_" + to_string(midelDisparity) + ".png";
+	//imshow(tempName, *totalResult);
+	waitKey(10);
 
 	chrono::high_resolution_clock::time_point stop = high_resolution_clock::now();
 	auto duration = duration_cast<seconds>(stop - start);
