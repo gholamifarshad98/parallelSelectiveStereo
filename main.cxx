@@ -36,6 +36,12 @@ struct Stain
 	vector<Point> stainPoints;
 
 };
+struct stainLimit
+{
+	int startingRow = 0;
+	int endingRow = 0;
+};
+typedef vector<shared_ptr<stainLimit>> stainLimits;
 int numOfColumns;
 int numOfRows;
 int numOfColumnsResized;
@@ -59,7 +65,7 @@ Vec3b bgrBackground(0, 0, 0);
 vector<int*> stainSize;
 void SSDstereo(shared_ptr<Mat>, shared_ptr<Mat>,shared_ptr<Mat>, int, int,int,int);
 //void selsectiveStereo(shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, layerVector*, int, int);
-void selsectiveStereo(shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, int, int,int, int);
+stainLimits selsectiveStereo(shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, int, int,int, int);
 void prepareResult(shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, shared_ptr<Mat>, vector<layerVector>, int, int, int);
 void reportResult(string );
 void filterResult(shared_ptr<Mat>, shared_ptr<Mat>, Vec3b);
@@ -141,7 +147,12 @@ int main()
 		////////////////////////////////////////////////////////////////////
 		/// In this part we have impelemet selective stereo.
 		////////////////////////////////////////////////////////////////////
-		selsectiveStereo(leftImageResized, rightImageResized, result_01, result_02, result_03, kernelSize, midDis, numOfRowsResized, numOfColumnsResized);
+		
+		stainLimits result_sainLimitsResized = selsectiveStereo(leftImageResized, rightImageResized, result_01, result_02, result_03, kernelSize, midDis, numOfRowsResized, numOfColumnsResized);
+		std::cout << "the midDisparity is " << midDis << std::endl;
+	/*	for (int q = 0; q <= result_sainLimitsResized.size(); q++) {
+			std::cout << "the stain limit is " << result_sainLimitsResized[q]->startingRow << " ---> " << result_sainLimitsResized[q]->endingRow << std::endl;
+		}*/
 	}
 
 	return 0;
@@ -270,7 +281,7 @@ int CalcCost(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage, int row, int
 /// In this part we clac selective disparity of each pixel.
 ////////////////////////////////////////////////////////////////////
 
-void selsectiveStereo(shared_ptr<Mat> leftImage_, shared_ptr<Mat> rightImage_, shared_ptr<Mat> result_1_, shared_ptr<Mat> result_2_, shared_ptr<Mat> result_3_, int kernelSize, int midelDisparity, int NRow, int NCols) {
+stainLimits selsectiveStereo(shared_ptr<Mat> leftImage_, shared_ptr<Mat> rightImage_, shared_ptr<Mat> result_1_, shared_ptr<Mat> result_2_, shared_ptr<Mat> result_3_, int kernelSize, int midelDisparity, int NRow, int NCols) {
 	auto start = chrono::high_resolution_clock::now();
 	bool left2right = false;
 	bool right2let = false;
@@ -289,9 +300,14 @@ void selsectiveStereo(shared_ptr<Mat> leftImage_, shared_ptr<Mat> rightImage_, s
 	int tempCost3;
 	int tempCost4;
 	int tempCost5;
+	int numOfDetectedPixel;
+	bool triger = false;
+	stainLimits tempStainLimits;
 
-	for (int u = (kernelSize / 2) + 1; u < (NCols - maxDisparity - kernelSize / 2) - 1; u++) {
-		for (int v = (kernelSize / 2) + 1; v < NRow; v++) {
+	for (int v = (kernelSize / 2) + 1; v < NRow; v++) {
+		numOfDetectedPixel = 0;
+		auto tempStainLimit = make_shared< stainLimit>();
+		for (int u = (kernelSize / 2) + 1; u < (NCols - maxDisparity - kernelSize / 2) - 1; u++) {
 			left2right = false;
 			right2let = false;
 			tempCost0 = CalcCost(leftImage_, rightImage_, v, u, kernelSize, temp0, NCols);
@@ -316,10 +332,22 @@ void selsectiveStereo(shared_ptr<Mat> leftImage_, shared_ptr<Mat> rightImage_, s
 				//result_2->at<Vec3b>(Point(u, v)) = bgrPixel_02;
 			}
 			if ((left2right & right2let)) {
-
+				numOfDetectedPixel = numOfDetectedPixel + 1;
 				result_3_->at<Vec3b>(Point(u, v)) = bgrPixel_04;
 			}
 		}
+
+		if (!triger & numOfDetectedPixel >= (NCols / 4)) {
+			triger = true;
+			tempStainLimit->startingRow = v;
+		}
+		if( (triger & numOfDetectedPixel < (NCols / 4))| (triger & v==(NCols - maxDisparity - kernelSize / 2) - 2)) {
+			tempStainLimit->endingRow = v;
+			triger = false;
+			tempStainLimits.push_back(tempStainLimit);
+		}
+
+
 	}
 	//auto totalResult = make_shared<Mat>(NRow, 2* NCols, CV_8UC3);;
 	//*totalResult = *result_1_;
@@ -330,7 +358,7 @@ void selsectiveStereo(shared_ptr<Mat> leftImage_, shared_ptr<Mat> rightImage_, s
 	//cv::hconcat(*totalResult, *result_3_, *totalResult);
 	string tempName = "totalResult_midDisparity_" + to_string(midelDisparity) + ".png";
 	//imshow(tempName, *totalResult);
-	waitKey(10);
+	cv::waitKey(10);
 
 	chrono::high_resolution_clock::time_point stop = high_resolution_clock::now();
 	auto duration = duration_cast<seconds>(stop - start);
