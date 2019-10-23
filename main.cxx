@@ -49,7 +49,7 @@ int numOfRowsResized;
 int thickness = 60;
 int maxDisparity = 50;
 int maxkernelSize = 35; // kernel size must be odd number.
-int kernelSize = 9;
+int kernelSize = 5;
 auto sstereoResult = make_shared<Mat>();
 typedef vector<pixel*> layerVector;
 vector<layerVector> layers;
@@ -150,9 +150,10 @@ int main()
 		
 		stainLimits result_sainLimitsResized = selsectiveStereo(leftImageResized, rightImageResized, result_01, result_02, result_03, kernelSize, midDis, numOfRowsResized, numOfColumnsResized);
 		std::cout << "the midDisparity is " << midDis << std::endl;
-	/*	for (int q = 0; q <= result_sainLimitsResized.size(); q++) {
-			std::cout << "the stain limit is " << result_sainLimitsResized[q]->startingRow << " ---> " << result_sainLimitsResized[q]->endingRow << std::endl;
-		}*/
+		std::cout << "the result_sainLimitsResized.size is " << result_sainLimitsResized.size() << std::endl; 
+		for (int q = 0; q < result_sainLimitsResized.size(); q++) {
+			std::cout << "the stain limit is " << result_sainLimitsResized[q]->startingRow <<" ----" << result_sainLimitsResized[q]->endingRow << std::endl;
+		}
 	}
 
 	return 0;
@@ -303,10 +304,12 @@ stainLimits selsectiveStereo(shared_ptr<Mat> leftImage_, shared_ptr<Mat> rightIm
 	int numOfDetectedPixel;
 	bool triger = false;
 	stainLimits tempStainLimits;
-
+	bool creationTriger = false;
+	shared_ptr <stainLimit > tempStainLimit ;
 	for (int v = (kernelSize / 2) + 1; v < NRow; v++) {
 		numOfDetectedPixel = 0;
-		auto tempStainLimit = make_shared< stainLimit>();
+		
+
 		for (int u = (kernelSize / 2) + 1; u < (NCols - maxDisparity - kernelSize / 2) - 1; u++) {
 			left2right = false;
 			right2let = false;
@@ -336,14 +339,25 @@ stainLimits selsectiveStereo(shared_ptr<Mat> leftImage_, shared_ptr<Mat> rightIm
 				result_3_->at<Vec3b>(Point(u, v)) = bgrPixel_04;
 			}
 		}
-
-		if (!triger & numOfDetectedPixel >= (NCols / 4)) {
+		if (!creationTriger) {
+			auto tempTemp = make_shared<stainLimit>();
+			tempStainLimit = tempTemp;
+			creationTriger = true;
+		}
+		if (!triger &( numOfDetectedPixel > NCols / 3)) {
 			triger = true;
+			//std::cout << "the starting  v is " << v << std::endl;
 			tempStainLimit->startingRow = v;
+			//std::cout << "the starting  v in the vector is " << tempStainLimit->startingRow << std::endl;
+
 		}
 		if( (triger & numOfDetectedPixel < (NCols / 4))| (triger & v==(NCols - maxDisparity - kernelSize / 2) - 2)) {
 			tempStainLimit->endingRow = v;
+			//std::cout << "the starting  v in the vector is " << tempStainLimit->startingRow << std::endl;
+			//std::cout << "the ending  v is " << v << std::endl;
+			//std::cout << "the ending  v in the vector is " << tempStainLimit->endingRow << std::endl;
 			triger = false;
+			creationTriger = false;
 			tempStainLimits.push_back(tempStainLimit);
 		}
 
@@ -358,7 +372,7 @@ stainLimits selsectiveStereo(shared_ptr<Mat> leftImage_, shared_ptr<Mat> rightIm
 	//cv::hconcat(*totalResult, *result_3_, *totalResult);
 	string tempName = "totalResult_midDisparity_" + to_string(midelDisparity) + ".png";
 	//imshow(tempName, *totalResult);
-	cv::waitKey(10);
+	cv::waitKey(1);
 
 	chrono::high_resolution_clock::time_point stop = high_resolution_clock::now();
 	auto duration = duration_cast<seconds>(stop - start);
@@ -366,7 +380,7 @@ stainLimits selsectiveStereo(shared_ptr<Mat> leftImage_, shared_ptr<Mat> rightIm
 	string duration_s = to_string(value);
 	string TempTimer = "the time of calculation of "+to_string(midelDisparity)+" midelDisparity is "+ duration_s + " (s)";
 	reportResult(TempTimer);
-
+	return tempStainLimits;
 
 	
 		
