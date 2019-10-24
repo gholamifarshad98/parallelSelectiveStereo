@@ -85,62 +85,52 @@ int main()
 	shared_ptr<Mat>  stereoResutResized= make_shared<Mat>();
 
 	auto start = chrono::high_resolution_clock::now();
-
 	ReadBothImages(leftImage, rightImage);
-	//imshow("test", *leftImage);
-	//waitKey(0);
 	numOfRows = leftImage->rows;
 	numOfColumns = leftImage->cols;
 	stereoResut = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC1);
 	SSDstereo(leftImage, rightImage, stereoResut, kernelSize, maxDisparity, numOfRows, numOfColumns);
-	cv::imshow("stereoOutput", *stereoResut);
-	cv::waitKey(1000);
+	//cv::imshow("stereoOutput", *stereoResut);
+	//cv::waitKey(1000);
 	chrono::high_resolution_clock::time_point stop = high_resolution_clock::now();
-	auto duration = duration_cast<seconds>(stop - start);
+	auto duration = duration_cast<milliseconds>(stop - start);
 	auto value = duration.count();
 	string duration_s = to_string(value);
 	ofstream repotredResult;
 	repotredResult.open("result.txt");
-	repotredResult << "Totaltime of SSDstereo result is " + duration_s + " (s)" << std::endl;
+	repotredResult << "Totaltime of SSDstereo result is " + duration_s + " (milliseconds)" << std::endl;
 	repotredResult.close();
 
 
-		try
-		{
-	}
+try	{}
 	catch (cv::Exception & e)
 	{
 		cerr << e.msg << endl; // output exception message
 	}
 
-	//auto start = chrono::high_resolution_clock::now();
+	start = chrono::high_resolution_clock::now();
 	cv::resize(*rightImage, *rightImageResized, cv::Size(), 0.5, 0.5);
 	cv::resize(*leftImage, *leftImageResized, cv::Size(), 0.5, 0.5);
 	numOfRowsResized = leftImageResized->rows;
 	numOfColumnsResized = leftImageResized->cols;
 	stereoResutResized = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC1);
 	SSDstereo(leftImageResized, rightImageResized, stereoResutResized, kernelSize, maxDisparity, numOfRowsResized, numOfColumnsResized);
-	cv::imshow("stereoOutputResized", *stereoResutResized);
-	cv::waitKey(10000);
-	//chrono::high_resolution_clock::time_point stop = high_resolution_clock::now();
-	//auto duration = duration_cast<seconds>(stop - start);
-	//auto value = duration.count();
-	//string duration_s = to_string(value);
-	//ofstream repotredResult;
-	//repotredResult.open("result.txt", std::ios_base::app | std::ios_base::out);
-	//repotredResult << "Totaltime of SSDstereo result for resized is " + duration_s + " (s)" << std::endl;
-	//repotredResult.close();
+	//cv::imshow("stereoOutputResized", *stereoResutResized);
+	//cv::waitKey(10000);
+	stop = high_resolution_clock::now();
+	duration = duration_cast<milliseconds>(stop - start);
+	value = duration.count();
+	duration_s = to_string(value);
+	repotredResult.open("result.txt", std::ios_base::app | std::ios_base::out);
+	repotredResult << "Totaltime of SSDstereo result for resized image is " + duration_s + " (milliseconds)" << std::endl;
+	repotredResult.close();
 
-	try
-	{}
+	try{}
 	catch (cv::Exception & e)
 	{
 		cerr << e.msg << endl; // output exception message
 	}
 	
-
-
-
 	for (int midDis = 1; midDis <= maxDisparity; midDis++) {
 		auto result_00 = make_shared<Mat>(numOfRowsResized, numOfColumnsResized, CV_8UC1);// Stereo result.
 		auto result_01 = make_shared<Mat>(numOfRowsResized, numOfColumnsResized, CV_8UC3);// Selective stereo L2R.
@@ -156,11 +146,15 @@ int main()
 		////////////////////////////////////////////////////////////////////
 		
 		stainLimits result_sainLimitsResized = selsectiveStereo(leftImageResized, rightImageResized, result_01, result_02, result_03, kernelSize, midDis, numOfRowsResized, numOfColumnsResized);
-		std::cout << "the midDisparity is " << midDis << std::endl;
-		std::cout << "the result_sainLimitsResized.size is " << result_sainLimitsResized.size() << std::endl; 
-		for (int q = 0; q < result_sainLimitsResized.size(); q++) {
-			std::cout << "the stain limit is " << result_sainLimitsResized[q]->startingRow <<" ----" << result_sainLimitsResized[q]->endingRow << std::endl;
-		}
+		//==========================================================================================================================
+		//this part hould be active if you want to see the limits of each layer in resized image.
+		//std::cout << "the midDisparity is " << midDis << std::endl;
+		//std::cout << "the result_sainLimitsResized.size is " << result_sainLimitsResized.size() << std::endl; 
+		//for (int q = 0; q < result_sainLimitsResized.size(); q++) {
+			//std::cout << "the stain limit is " << result_sainLimitsResized[q]->startingRow <<" ----" << result_sainLimitsResized[q]->endingRow << std::endl;
+		//}
+
+		//==========================================================================================================================
 	}
 
 	return 0;
@@ -363,18 +357,20 @@ stainLimits selsectiveStereo(shared_ptr<Mat> leftImage_, shared_ptr<Mat> rightIm
 	//*totalResult = *result_1_;
 	//imshow("result_1", *result_1);
 	//imshow("result_2", *result_2);
-	imshow("result_3_", *result_3_);
+	//==================================================================
+	//imshow("result_3_", *result_3_);      //this part should be active if you want to see results.
+	//=================================================================================
 	//cv::hconcat(*result_1_, *result_2_, *totalResult);
 	//cv::hconcat(*totalResult, *result_3_, *totalResult);
 	string tempName = "totalResult_midDisparity_" + to_string(midelDisparity) + ".png";
 	//imshow(tempName, *totalResult);
-	cv::waitKey(1);
+	//cv::waitKey(1);
 
 	chrono::high_resolution_clock::time_point stop = high_resolution_clock::now();
-	auto duration = duration_cast<seconds>(stop - start);
+	auto duration = duration_cast<milliseconds>(stop - start);
 	auto value = duration.count();
 	string duration_s = to_string(value);
-	string TempTimer = "the time of calculation of "+to_string(midelDisparity)+" midelDisparity is "+ duration_s + " (s)";
+	string TempTimer = "the time of calculation of "+to_string(midelDisparity)+" midelDisparity is "+ duration_s + " (milliseconds)";
 	reportResult(TempTimer);
 	return tempStainLimits;
 
