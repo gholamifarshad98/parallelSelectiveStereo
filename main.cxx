@@ -304,11 +304,9 @@ stainLimits selsectiveStereo(shared_ptr<Mat> leftImage_, shared_ptr<Mat> rightIm
 	stainLimits tempStainLimits;
 	bool creationTriger = false;
 	shared_ptr <stainLimit > tempStainLimit ;
-	for (int v = (kernelSize / 2) + 10; v < NRow-(kernelSize / 2)-10; v++) {
+	for (int v = (kernelSize / 2) + 1; v < NRow-(kernelSize / 2)-1; v++) {
 		numOfDetectedPixel = 0;
-		
-
-		for (int u = (kernelSize / 2) + 1; u < (NCols - maxDisparity - kernelSize / 2) - 1; u++) {
+		for (int u = (kernelSize / 2) + 2; u < (NCols - maxDisparity - kernelSize / 2) - 1; u++) {
 			left2right = false;
 			right2let = false;
 			tempCost0 = CalcCost(leftImage_, rightImage_, v, u, kernelSize, temp0, NCols);
