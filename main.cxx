@@ -47,9 +47,9 @@ int numOfRows;
 int numOfColumnsResized;
 int numOfRowsResized;
 int thickness = 60;
-int maxDisparity = 50;
+int maxDisparity = 30;
 int maxkernelSize = 35; // kernel size must be odd number.
-int kernelSize = 5;
+int kernelSize = 9;
 auto sstereoResult = make_shared<Mat>();
 typedef vector<pixel*> layerVector;
 vector<layerVector> layers;
@@ -75,56 +75,64 @@ void stainDetector(shared_ptr<Mat>, shared_ptr<Mat>, Vec3b, shared_ptr<vector<sh
 void mergingStains(shared_ptr<Mat> , shared_ptr<vector<shared_ptr<Stain>>> );
 int main()
 {
-	auto rightImage = make_shared<Mat>();
-	auto leftImage = make_shared<Mat>();
+	
+	shared_ptr<Mat> rightImage= make_shared<Mat>() ;
+	shared_ptr<Mat> leftImage=make_shared<Mat>();
+	shared_ptr<Mat> rightImageResized = make_shared<Mat>();
+	shared_ptr<Mat> leftImageResized = make_shared<Mat>();
+	
+	shared_ptr<Mat>  stereoResut= make_shared<Mat>();
+	shared_ptr<Mat>  stereoResutResized= make_shared<Mat>();
+
+	auto start = chrono::high_resolution_clock::now();
+
 	ReadBothImages(leftImage, rightImage);
-	auto rightImageResized = make_shared<Mat>();
-	auto leftImageResized = make_shared<Mat>();
-	cv::resize(*rightImage, *rightImageResized, cv::Size(), 0.5, 0.5);
-	cv::resize(*leftImage, *leftImageResized, cv::Size(), 0.5, 0.5);
+	//imshow("test", *leftImage);
+	//waitKey(0);
 	numOfRows = leftImage->rows;
 	numOfColumns = leftImage->cols;
+	stereoResut = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC1);
+	SSDstereo(leftImage, rightImage, stereoResut, kernelSize, maxDisparity, numOfRows, numOfColumns);
+	cv::imshow("stereoOutput", *stereoResut);
+	cv::waitKey(1000);
+	chrono::high_resolution_clock::time_point stop = high_resolution_clock::now();
+	auto duration = duration_cast<seconds>(stop - start);
+	auto value = duration.count();
+	string duration_s = to_string(value);
+	ofstream repotredResult;
+	repotredResult.open("result.txt");
+	repotredResult << "Totaltime of SSDstereo result is " + duration_s + " (s)" << std::endl;
+	repotredResult.close();
+
+
+		try
+		{
+	}
+	catch (cv::Exception & e)
+	{
+		cerr << e.msg << endl; // output exception message
+	}
+
+	//auto start = chrono::high_resolution_clock::now();
+	cv::resize(*rightImage, *rightImageResized, cv::Size(), 0.5, 0.5);
+	cv::resize(*leftImage, *leftImageResized, cv::Size(), 0.5, 0.5);
 	numOfRowsResized = leftImageResized->rows;
 	numOfColumnsResized = leftImageResized->cols;
-	auto stereoResut = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC1);
-	auto stereoResutResized = make_shared<Mat>(numOfRowsResized, numOfColumnsResized, CV_8UC1);
-	//try
-	//{
-	//	auto start = chrono::high_resolution_clock::now();
-	//	
-	//	SSDstereo(leftImage, rightImage, stereoResut, kernelSize, maxDisparity, numOfRows, numOfColumns);
-	//	//cv::imshow("stereoOutput", *stereoResut);
-	//	//cv::waitKey(00);
-	//	chrono::high_resolution_clock::time_point stop = high_resolution_clock::now();
-	//	auto duration = duration_cast<seconds>(stop - start);
-	//	auto value = duration.count();
-	//	string duration_s = to_string(value);
-	//	ofstream repotredResult;
-	//	repotredResult.open("result.txt");
-	//	repotredResult << "Totaltime of SSDstereo result is " + duration_s + " (s)" << std::endl;
-	//	repotredResult.close();
-	//}
-	//catch (cv::Exception & e)
-	//{
-	//	cerr << e.msg << endl; // output exception message
-	//}
+	stereoResutResized = make_shared<Mat>(numOfRows, numOfColumns, CV_8UC1);
+	SSDstereo(leftImageResized, rightImageResized, stereoResutResized, kernelSize, maxDisparity, numOfRowsResized, numOfColumnsResized);
+	cv::imshow("stereoOutputResized", *stereoResutResized);
+	cv::waitKey(10000);
+	//chrono::high_resolution_clock::time_point stop = high_resolution_clock::now();
+	//auto duration = duration_cast<seconds>(stop - start);
+	//auto value = duration.count();
+	//string duration_s = to_string(value);
+	//ofstream repotredResult;
+	//repotredResult.open("result.txt", std::ios_base::app | std::ios_base::out);
+	//repotredResult << "Totaltime of SSDstereo result for resized is " + duration_s + " (s)" << std::endl;
+	//repotredResult.close();
 
 	try
-	{
-		auto start = chrono::high_resolution_clock::now();
-		
-		SSDstereo(leftImageResized, rightImageResized, stereoResutResized, kernelSize, maxDisparity, numOfRowsResized, numOfColumnsResized);
-		//cv::imshow("stereoOutputResized", *stereoResutResized);
-		//cv::waitKey(10000);
-		chrono::high_resolution_clock::time_point stop = high_resolution_clock::now();
-		auto duration = duration_cast<seconds>(stop - start);
-		auto value = duration.count();
-		string duration_s = to_string(value);
-		ofstream repotredResult;
-		repotredResult.open("result_selective.txt");
-		repotredResult << "Totaltime of SSDstereo result is " + duration_s + " (s)" << std::endl;
-		repotredResult.close();
-	}
+	{}
 	catch (cv::Exception & e)
 	{
 		cerr << e.msg << endl; // output exception message
@@ -135,12 +143,11 @@ int main()
 
 	for (int midDis = 1; midDis <= maxDisparity; midDis++) {
 		auto result_00 = make_shared<Mat>(numOfRowsResized, numOfColumnsResized, CV_8UC1);// Stereo result.
-		*result_00 = *stereoResutResized;
 		auto result_01 = make_shared<Mat>(numOfRowsResized, numOfColumnsResized, CV_8UC3);// Selective stereo L2R.
 		auto result_02 = make_shared<Mat>(numOfRowsResized, numOfColumnsResized, CV_8UC3);// Selective stereo R2L.
 		auto result_03 = make_shared<Mat>(numOfRowsResized, numOfColumnsResized, CV_8UC3);// slective with L2R and R2L consistance.
 		auto result_04 = make_shared<Mat>(numOfRowsResized, numOfColumnsResized, CV_8UC3);// slective with L2R and R2L notconsistance.
-		auto result_total = make_shared<Mat>(4 * numOfRowsResized, numOfColumnsResized, CV_8UC3, bgrBackground);
+		*result_00 = *stereoResutResized;
 		cvtColor(*result_00, *result_01, CV_GRAY2RGB);
 		cvtColor(*result_00, *result_02, CV_GRAY2RGB);
 		cvtColor(*result_00, *result_03, CV_GRAY2RGB);
@@ -163,23 +170,12 @@ int main()
 /// In this part we can load two Images.
 ////////////////////////////////////////////////////////////////////
 void ReadBothImages(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage) {
-
 	try {
+
 		*rightImage = imread("1.png", CV_LOAD_IMAGE_GRAYSCALE);   // Read the right image
 		//rightImage->convertTo(*rightImage, CV_64F);
-		*rightImage = *rightImage;
 		*leftImage = imread("2.png", CV_LOAD_IMAGE_GRAYSCALE);   // Read the left image
 		//leftImage->convertTo(*leftImage, CV_64F);
-		*leftImage = *leftImage;
-		
-		if (!rightImage->data)                             // Check for invalid input
-		{
-			throw "right";
-		}
-		if (!leftImage->data)                             // Check for invalid input
-		{
-			throw "left";
-		}
 	}
 	catch (char* error) {
 		cout << "can not load the " << error << " iamge" << endl;
@@ -231,26 +227,28 @@ double CalcDistance(int numOfRows, int numOfColumns, int row, int column) {
 ////////////////////////////////////////////////////////////////////
 /// In this part we clac disparity of each pixel.
 ////////////////////////////////////////////////////////////////////
-void  SSDstereo(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage,shared_ptr<Mat> result_temp, int kernelSize, int maxDisparity,int NRow,int NCols) {
+void  SSDstereo(shared_ptr<Mat> leftImage_, shared_ptr<Mat> rightImage_,shared_ptr<Mat> result_temp_, int kernelSize, int maxDisparity,int NRow,int NCols) {
 	int tempCost = 0;
 	int tempDisparity = 0;
+	
 	for (int u = (kernelSize/2)+1; u <(NCols -maxDisparity-kernelSize/2)-1 ; u++) {
-		for (int v = (kernelSize / 2) + 1; v <NRow; v++) {
+		for (int v = (kernelSize / 2) + 1; v <NRow-(kernelSize / 2); v++) {
 			double cost = 10000000;
 			tempCost = 0;
 			tempDisparity = 0;
 			for (int i = 0; i < maxDisparity; i++) {
-				tempCost = CalcCost(leftImage, rightImage,v ,u , kernelSize, i, NCols);
+				tempCost = CalcCost(leftImage_, rightImage_,v ,u , kernelSize, i, NCols);
 				if (tempCost < cost) {
 					cost = tempCost;
 					tempDisparity = i;
 				}
 			}
 			tempDisparity = tempDisparity * 255 / maxDisparity;
-			result_temp->at<uchar>(v, u) = tempDisparity;
-			//std::cout << " tempDisparity is " << tempDisparity << std::endl;
+			result_temp_->at<uchar>(v, u) = tempDisparity;
+			//std::cout << " tempDisparity for ("<< u<<","<<v<<") is "  << tempDisparity << std::endl;
 		}
 	}
+	//std::cout << "debug" << std::endl;
 	//cv::imshow("stereoOutput", *result_temp);
 	//cv::waitKey(100);
 }
@@ -259,7 +257,7 @@ void  SSDstereo(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage,shared_ptr
 ////////////////////////////////////////////////////////////////////
 /// In this part we clac cost of each pixel for sepecfic disparity.
 ////////////////////////////////////////////////////////////////////
-int CalcCost(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage, int row, int column, int kernelSize, int disparity,int NCols) {
+int CalcCost(shared_ptr<Mat> leftImage_, shared_ptr<Mat> rightImage_, int row, int column, int kernelSize, int disparity,int NCols) {
 	int cost = 0;
 	for (int u = -int(kernelSize / 2); u <= int(kernelSize / 2); u++) {
 		for (int v = -int(kernelSize / 2); v <= int(kernelSize / 2); v++) {
@@ -271,7 +269,7 @@ int CalcCost(shared_ptr<Mat> leftImage, shared_ptr<Mat> rightImage, int row, int
 			if (column + u + disparity >= NCols) {
 				cout << "*****************************************************" << endl;
 			}
-			cost = cost + int(pow((leftImage->at<uchar>(row + v, column + u) - (rightImage->at<uchar>(row + v, column + u + disparity))), 2));
+			cost = cost + int(pow((leftImage_->at<uchar>(row + v, column + u) - (rightImage_->at<uchar>(row + v, column + u + disparity))), 2));
 		}
 	}
 	return cost;
@@ -306,7 +304,7 @@ stainLimits selsectiveStereo(shared_ptr<Mat> leftImage_, shared_ptr<Mat> rightIm
 	stainLimits tempStainLimits;
 	bool creationTriger = false;
 	shared_ptr <stainLimit > tempStainLimit ;
-	for (int v = (kernelSize / 2) + 1; v < NRow; v++) {
+	for (int v = (kernelSize / 2) + 10; v < NRow-(kernelSize / 2)-10; v++) {
 		numOfDetectedPixel = 0;
 		
 
